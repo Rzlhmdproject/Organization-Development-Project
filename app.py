@@ -1,9 +1,10 @@
 import os
+import time
 import streamlit as st
 from google import genai
 from google.genai import types
 
-# Konfigurasi Halaman (Mode Wide agar terlihat seperti Dashboard Profesional)
+# Konfigurasi Halaman Dashboard Wide
 st.set_page_config(
     page_title="OD Job Desc Generator - PT Complete Selular",
     page_icon="🏢",
@@ -11,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom Styling CSS untuk tampilan yang lebih bersih dan elegan
+# Custom CSS Styling
 st.markdown("""
     <style>
     .main-title {
@@ -43,18 +44,24 @@ st.markdown("""
 st.markdown('<p class="main-title">🏢 Organization Development - Job Description Generator</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-title">PT Complete Selular | Sistem Otomatisasi Penyusunan Standar Kompetensi & Tugas Jabatan</p>', unsafe_allow_html=True)
 
-# Mengambil API Key dari Secrets Streamlit / Environment
+# Mengambil API Key dari Secrets Streamlit / Environment Variable
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
-# Layout Utama Menjadi 2 Kolom (Kiri: Input, Kanan: Output)
+# Layout Utama 2 Kolom (Input & Output)
 col_input, col_output = st.columns([1, 1], gap="large")
 
 with col_input:
     st.markdown("### 📥 Input Draf PIC")
     
-    # Opsi tambahan untuk memperkaya konteks jabatan
     job_title = st.text_input("Nama Jabatan / Posisi:", placeholder="Contoh: Store Supervisor / HR Staff")
-    department = st.selectbox("Departemen:", ["Retail / Store Operations", "Human Resources (OD/HC)", "Finance & Accounting", "Marketing", "Supply Chain / Warehouse", "IT & Support"])
+    department = st.selectbox("Departemen:", [
+        "Retail / Store Operations", 
+        "Human Resources (OD/HC)", 
+        "Finance & Accounting", 
+        "Marketing", 
+        "Supply Chain / Warehouse", 
+        "IT & Support"
+    ])
     
     raw_input = st.text_area(
         "Masukkan Catatan / Draf Kasar Tugas dari PIC:",
@@ -66,7 +73,6 @@ with col_input:
 
 with col_output:
     st.markdown("### 📄 Hasil Dokumen Resmi OD")
-    
     output_container = st.container()
     
     if process_btn:
@@ -95,13 +101,12 @@ with col_output:
                        - C. Laporan (Reporting Tasks / Pembuatan laporan berkala harian, mingguan, bulanan, dll)
                     5. Urutkan poin berdasarkan tingkat prioritas dan kepentingannya dari yang tertinggi.
 
-                    FORMAT OUTPUT (Gunakan Markdown yang rapi):
+                    FORMAT OUTPUT:
                     ### POSISI: {job_title or "Professional Staff"}
                     ### DEPARTEMEN: {department}
 
                     A. Tugas Utama
                     1. [Kalimat efektif diawali KKO...]
-                    2. [Kalimat efektif diawali KKO...]
 
                     B. Administrasi
                     1. [Kalimat efektif diawali KKO...]
@@ -110,33 +115,47 @@ with col_output:
                     1. [Kalimat efektif diawali KKO...]
                     """
 
-                    response = client.models.generate_content(
-                        model='gemini-2.0-flash',
-                        contents=f"Ubah catatan tugas kasar berikut menjadi Job Description profesional:\n\n{raw_input}",
-                        config=types.GenerateContentConfig(
-                            system_instruction=system_instruction,
-                            temperature=0.2,
-                        ),
-                    )
+                    # Daftar model prioritas untuk menjamin keberhasilan pemrosesan
+                    candidate_models = ['gemini-3.8-flash', 'gemini-1.5-pro', 'gemini-1.5-flash']
+                    
+                    response = None
+                    last_error = None
+
+                    # Melakukan iterasi model cadangan jika model utama gagal/sibuk
+                    for model_name in candidate_models:
+                        try:
+                            response = client.models.generate_content(
+                                model=model_name,
+                                contents=f"Ubah catatan tugas kasar berikut menjadi Job Description profesional:\n\n{raw_input}",
+                                config=types.GenerateContentConfig(
+                                    system_instruction=system_instruction,
+                                    temperature=0.2,
+                                ),
+                            )
+                            if response and response.text:
+                                break
+                        except Exception as e:
+                            last_error = e
+                            time.sleep(1) # Jeda singkat sebelum coba model berikutnya
+                            continue
 
                     if response and response.text:
                         st.session_state['generated_result'] = response.text
                     else:
-                        st.error("Gagal memproses respons dari server.")
+                        st.error(f"Gagal memproses permintaan dari server AI. Kendala: {last_error}")
                         
                 except Exception as e:
                     with output_container:
                         st.error(f"Terjadi kendala teknis: {e}")
 
-    # Tampilkan hasil jika sudah ada di session state
+    # Tampilkan Hasil di Kolom Kanan
     if 'generated_result' in st.session_state:
         with output_container:
             st.success("✅ Job Description Berhasil Disusun!")
             st.code(st.session_state['generated_result'], language="markdown")
             
-            # Tombol unduh hasil teks
             st.download_button(
-                label="📥 Unduh sebagai File (.txt)",
+                label="📥 Unduh Hasil (.txt)",
                 data=st.session_state['generated_result'],
                 file_name=f"JobDesc_{job_title.replace(' ', '_') if job_title else 'Employee'}.txt",
                 mime="text/plain"
