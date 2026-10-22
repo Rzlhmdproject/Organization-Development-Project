@@ -27,70 +27,52 @@ if st.button("✨ Proses & Rapikan Job Desc", type="primary"):
         st.warning("Mohon isi draf kasar dari PIC terlebih dahulu.")
     else:
         with st.spinner("Sedang memproses dan menyusun sesuai standar OD..."):
-            # Daftar model prioritas (jika model utama 503, otomatis gunakan model cadangan)
-            candidate_models = ['gemini-3.8-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp']
-            
-            client = genai.Client(api_key=api_key)
-            
-            system_instruction = """
-            Anda adalah seorang ahli Organization Development (OD) dan HR Operations profesional di PT Complete Selular.
-            Tugas Anda adalah merapikan draf tugas kasar (Job Desc) dari PIC ke dalam format dokumen resmi perusahaan.
-
-            KETENTUAN PENULISAN:
-            1. Jangan mengubah makna substansial dari informasi dasar yang diberikan oleh PIC.
-            2. Jangan menambahkan tugas baru di luar informasi yang diberikan, kecuali untuk menyempurnakan struktur kalimat.
-            3. Gunakan kalimat efektif dan wajib diawali dengan Kata Kerja Operasional (KKO) seperti: Bertanggung jawab..., Melaksanakan..., Memastikan..., Melakukan..., Mengoordinasikan..., Menyusun..., Mengawasi..., Memverifikasi...
-            4. Hindari pengulangan makna antar poin. Gabungkan aktivitas dengan tujuan serupa.
-            5. Susun poin berdasarkan tingkat kepentingannya (prioritas tertinggi di awal).
-            6. Klasifikasikan setiap poin ke dalam 3 kategori berikut secara tegas TANPA duplikasi antar kategori:
-               - A. Tugas Utama
-               - B. Administrasi
-               - C. Laporan
-
-            FORMAT OUTPUT:
-            A. Tugas Utama
-            1. [Poin...]
-            
-            B. Administrasi
-            1. [Poin...]
-            
-            C. Laporan
-            1. [Poin...]
-            """
-
-            response = None
-            last_error = None
-
-            # Coba setiap model yang tersedia
-            for model_name in candidate_models:
-                success = False
-                for attempt in range(2): # Coba 2 kali per model
-                    try:
-                        response = client.models.generate_content(
-                            model=model_name,
-                            contents=f"Ubah draf kasar berikut sesuai standar OD:\n\n{raw_input}",
-                            config=types.GenerateContentConfig(
-                                system_instruction=system_instruction,
-                                temperature=0.2,
-                            ),
-                        )
-                        if response and response.text:
-                            success = True
-                            break
-                    except Exception as err:
-                        last_error = err
-                        # Jika server sibuk (503), tunggu 2 detik sebelum retry
-                        if "503" in str(err):
-                            time.sleep(2)
-                        else:
-                            break # Jika error tipe lain (misal 404), langsung ganti model
+            try:
+                # Menggunakan client resmi dari google-genai
+                client = genai.Client(api_key=api_key)
                 
-                if success:
-                    break
+                system_instruction = """
+                Anda adalah seorang ahli Organization Development (OD) dan HR Operations profesional di PT Complete Selular.
+                Tugas Anda adalah merapikan draf tugas kasar (Job Desc) dari PIC ke dalam format dokumen resmi perusahaan.
 
-            if response and response.text:
-                st.success("Berhasil disusun!")
-                st.markdown("### 📄 Hasil Job Description Standar OD")
-                st.code(response.text, language="markdown")
-            else:
-                st.error(f"Server Google AI sedang sangat padat saat ini. Silakan coba klik tombol kembali beberapa saat lagi. Detail: {last_error}")
+                KETENTUAN PENULISAN:
+                1. Jangan mengubah makna substansial dari informasi dasar yang diberikan oleh PIC.
+                2. Jangan menambahkan tugas baru di luar informasi yang diberikan, kecuali untuk menyempurnakan struktur kalimat.
+                3. Gunakan kalimat efektif dan wajib diawali dengan Kata Kerja Operasional (KKO) seperti: Bertanggung jawab..., Melaksanakan..., Memastikan..., Melakukan..., Mengoordinasikan..., Menyusun..., Mengawasi..., Memverifikasi...
+                4. Hindari pengulangan makna antar poin. Gabungkan aktivitas dengan tujuan serupa.
+                5. Susun poin berdasarkan tingkat kepentingannya (prioritas tertinggi di awal).
+                6. Klasifikasikan setiap poin ke dalam 3 kategori berikut secara tegas TANPA duplikasi antar kategori:
+                   - A. Tugas Utama
+                   - B. Administrasi
+                   - C. Laporan
+
+                FORMAT OUTPUT:
+                A. Tugas Utama
+                1. [Poin...]
+                
+                B. Administrasi
+                1. [Poin...]
+                
+                C. Laporan
+                1. [Poin...]
+                """
+
+                # Menggunakan model stabil gemini-1.5-flash
+                response = client.models.generate_content(
+                    model='gemini-1.5-flash',
+                    contents=f"Ubah draf kasar berikut sesuai standar OD:\n\n{raw_input}",
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.2,
+                    ),
+                )
+
+                if response and response.text:
+                    st.success("Berhasil disusun!")
+                    st.markdown("### 📄 Hasil Job Description Standar OD")
+                    st.code(response.text, language="markdown")
+                else:
+                    st.error("Gagal mendapatkan respons dari model. Silakan coba lagi.")
+                
+            except Exception as e:
+                st.error(f"Terjadi kesalahan: {e}")
