@@ -1,14 +1,6 @@
 {
-  "builds": [
-    {
-      "src": "app.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "app.py"
-    }
-  ]
+  "buildCommand": "",
+  "outputDirectory": "",
+  "framework": "streamlit",
+  "installCommand": "pip install -r requirements.txt"
 }
