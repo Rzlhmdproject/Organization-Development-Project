@@ -1,4 +1,5 @@
 import os
+import time
 import streamlit as st
 from google import genai
 from google.genai import types
@@ -55,18 +56,32 @@ if st.button("✨ Proses & Rapikan Job Desc", type="primary"):
                 1. [Poin...]
                 """
 
-                response = client.models.generate_content(
-                    model='gemini-3.8-flash',
-                    contents=f"Ubah draf kasar berikut sesuai standar OD:\n\n{raw_input}",
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        temperature=0.2,
-                    ),
-                )
+                # Coba hingga 3 kali jika server mengalami lonjakan beban (503)
+                max_retries = 3
+                response = None
+                
+                for attempt in range(max_retries):
+                    try:
+                        response = client.models.generate_content(
+                            model='gemini-3.8-flash',
+                            contents=f"Ubah draf kasar berikut sesuai standar OD:\n\n{raw_input}",
+                            config=types.GenerateContentConfig(
+                                system_instruction=system_instruction,
+                                temperature=0.2,
+                            ),
+                        )
+                        break  # Berhasil, keluar dari loop retry
+                    except Exception as err:
+                        if "503" in str(err) and attempt < max_retries - 1:
+                            time.sleep(3)  # Tunggu 3 detik sebelum mencoba lagi
+                            continue
+                        else:
+                            raise err
 
-                st.success("Berhasil disusun!")
-                st.markdown("### 📄 Hasil Job Description Standar OD")
-                st.code(response.text, language="markdown")
+                if response and response.text:
+                    st.success("Berhasil disusun!")
+                    st.markdown("### 📄 Hasil Job Description Standar OD")
+                    st.code(response.text, language="markdown")
                 
             except Exception as e:
                 st.error(f"Terjadi kesalahan: {e}")
