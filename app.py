@@ -27,61 +27,70 @@ if st.button("✨ Proses & Rapikan Job Desc", type="primary"):
         st.warning("Mohon isi draf kasar dari PIC terlebih dahulu.")
     else:
         with st.spinner("Sedang memproses dan menyusun sesuai standar OD..."):
-            try:
-                client = genai.Client(api_key=api_key)
-                
-                system_instruction = """
-                Anda adalah seorang ahli Organization Development (OD) dan HR Operations profesional di PT Complete Selular.
-                Tugas Anda adalah merapikan draf tugas kasar (Job Desc) dari PIC ke dalam format dokumen resmi perusahaan.
+            # Daftar model prioritas (jika model utama 503, otomatis gunakan model cadangan)
+            candidate_models = ['gemini-3.8-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp']
+            
+            client = genai.Client(api_key=api_key)
+            
+            system_instruction = """
+            Anda adalah seorang ahli Organization Development (OD) dan HR Operations profesional di PT Complete Selular.
+            Tugas Anda adalah merapikan draf tugas kasar (Job Desc) dari PIC ke dalam format dokumen resmi perusahaan.
 
-                KETENTUAN PENULISAN:
-                1. Jangan mengubah makna substansial dari informasi dasar yang diberikan oleh PIC.
-                2. Jangan menambahkan tugas baru di luar informasi yang diberikan, kecuali untuk menyempurnakan struktur kalimat.
-                3. Gunakan kalimat efektif dan wajib diawali dengan Kata Kerja Operasional (KKO) seperti: Bertanggung jawab..., Melaksanakan..., Memastikan..., Melakukan..., Mengoordinasikan..., Menyusun..., Mengawasi..., Memverifikasi...
-                4. Hindari pengulangan makna antar poin. Gabungkan aktivitas dengan tujuan serupa.
-                5. Susun poin berdasarkan tingkat kepentingannya (prioritas tertinggi di awal).
-                6. Klasifikasikan setiap poin ke dalam 3 kategori berikut secara tegas TANPA duplikasi antar kategori:
-                   - A. Tugas Utama
-                   - B. Administrasi
-                   - C. Laporan
+            KETENTUAN PENULISAN:
+            1. Jangan mengubah makna substansial dari informasi dasar yang diberikan oleh PIC.
+            2. Jangan menambahkan tugas baru di luar informasi yang diberikan, kecuali untuk menyempurnakan struktur kalimat.
+            3. Gunakan kalimat efektif dan wajib diawali dengan Kata Kerja Operasional (KKO) seperti: Bertanggung jawab..., Melaksanakan..., Memastikan..., Melakukan..., Mengoordinasikan..., Menyusun..., Mengawasi..., Memverifikasi...
+            4. Hindari pengulangan makna antar poin. Gabungkan aktivitas dengan tujuan serupa.
+            5. Susun poin berdasarkan tingkat kepentingannya (prioritas tertinggi di awal).
+            6. Klasifikasikan setiap poin ke dalam 3 kategori berikut secara tegas TANPA duplikasi antar kategori:
+               - A. Tugas Utama
+               - B. Administrasi
+               - C. Laporan
 
-                FORMAT OUTPUT:
-                A. Tugas Utama
-                1. [Poin...]
-                
-                B. Administrasi
-                1. [Poin...]
-                
-                C. Laporan
-                1. [Poin...]
-                """
+            FORMAT OUTPUT:
+            A. Tugas Utama
+            1. [Poin...]
+            
+            B. Administrasi
+            1. [Poin...]
+            
+            C. Laporan
+            1. [Poin...]
+            """
 
-                # Coba hingga 3 kali jika server mengalami lonjakan beban (503)
-                max_retries = 3
-                response = None
-                
-                for attempt in range(max_retries):
+            response = None
+            last_error = None
+
+            # Coba setiap model yang tersedia
+            for model_name in candidate_models:
+                success = False
+                for attempt in range(2): # Coba 2 kali per model
                     try:
                         response = client.models.generate_content(
-                            model='gemini-3.8-flash',
+                            model=model_name,
                             contents=f"Ubah draf kasar berikut sesuai standar OD:\n\n{raw_input}",
                             config=types.GenerateContentConfig(
                                 system_instruction=system_instruction,
                                 temperature=0.2,
                             ),
                         )
-                        break  # Berhasil, keluar dari loop retry
+                        if response and response.text:
+                            success = True
+                            break
                     except Exception as err:
-                        if "503" in str(err) and attempt < max_retries - 1:
-                            time.sleep(3)  # Tunggu 3 detik sebelum mencoba lagi
-                            continue
+                        last_error = err
+                        # Jika server sibuk (503), tunggu 2 detik sebelum retry
+                        if "503" in str(err):
+                            time.sleep(2)
                         else:
-                            raise err
-
-                if response and response.text:
-                    st.success("Berhasil disusun!")
-                    st.markdown("### 📄 Hasil Job Description Standar OD")
-                    st.code(response.text, language="markdown")
+                            break # Jika error tipe lain (misal 404), langsung ganti model
                 
-            except Exception as e:
-                st.error(f"Terjadi kesalahan: {e}")
+                if success:
+                    break
+
+            if response and response.text:
+                st.success("Berhasil disusun!")
+                st.markdown("### 📄 Hasil Job Description Standar OD")
+                st.code(response.text, language="markdown")
+            else:
+                st.error(f"Server Google AI sedang sangat padat saat ini. Silakan coba klik tombol kembali beberapa saat lagi. Detail: {last_error}")
