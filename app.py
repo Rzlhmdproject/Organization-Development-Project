@@ -56,7 +56,7 @@ if st.button("✨ Proses & Rapikan Job Desc", type="primary"):
                 """
 
                 response = client.models.generate_content(
-                    model='gemini-1.5-flash',
+                    model='gemini-2.0-flash',
                     contents=f"Ubah draf kasar berikut sesuai standar OD:\n\n{raw_input}",
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
