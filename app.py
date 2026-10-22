@@ -9,8 +9,8 @@ st.set_page_config(page_title="Generator Job Description - Complete Selular", pa
 st.title("📝 Generator Job Description OD")
 st.caption("Aplikasi otomatisasi penyusunan Job Description sesuai standar PT Complete Selular")
 
-# Input API Key (opsional jika sudah diset di environment variable Vercel)
-api_key = os.environ.get("GEMINI_API_KEY") or st.sidebar.text_input("Gemini API Key:", type="password")
+# Mengambil API Key langsung dari Secrets / Environment Variable
+api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
 # Form Input Teks Kasar dari PIC
 raw_input = st.text_area(
@@ -21,7 +21,7 @@ raw_input = st.text_area(
 
 if st.button("✨ Proses & Rapikan Job Desc", type="primary"):
     if not api_key:
-        st.error("Silakan masukkan Gemini API Key terlebih dahulu di sidebar atau environment variable!")
+        st.error("API Key belum terkonfigurasi di Streamlit Secrets! Silakan atur terlebih dahulu di dashboard Streamlit.")
     elif not raw_input.strip():
         st.warning("Mohon isi draf kasar dari PIC terlebih dahulu.")
     else:
